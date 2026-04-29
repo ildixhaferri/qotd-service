@@ -166,6 +166,21 @@
 
     <section aria-labelledby="all-heading">
       <h2 id="all-heading">All Quotes</h2>
+      <p id="quote-count" style="color: #666; font-size: 0.875rem; margin: 0 0 0.75rem"></p>
+      <div style="margin-bottom: 0.75rem">
+        <label
+          for="author-filter"
+          style="font-size: 0.875rem; font-weight: 600; display: block; margin-bottom: 0.3rem"
+          >Filter by author</label
+        >
+        <input
+          type="text"
+          id="author-filter"
+          placeholder="e.g. Einstein"
+          aria-label="Filter quotes by author"
+          style="max-width: 320px"
+        />
+      </div>
       <ul id="quotes-list" aria-label="All quotes"></ul>
       <p class="inline-error" id="list-error" role="alert" hidden></p>
     </section>
@@ -197,6 +212,8 @@
       const quotesList = document.getElementById('quotes-list');
       const listError = document.getElementById('list-error');
       const formError = document.getElementById('form-error');
+      const quoteCount = document.getElementById('quote-count');
+      const authorFilter = document.getElementById('author-filter');
 
       function showError(el, msg) {
         el.textContent = msg;
@@ -237,10 +254,22 @@
         }
       }
 
-      async function loadQuotes() {
-        clearError(listError);
+      async function loadCount() {
         try {
-          const res = await fetch('/api/quotes');
+          const res = await fetch('/api/quotes/count');
+          if (!res.ok) return;
+          const body = await res.json();
+          quoteCount.textContent = `${body.data.count} quotes`;
+        } catch {
+          // count is informational — stay silent on failure
+        }
+      }
+
+      async function loadQuotes(author = '') {
+        clearError(listError);
+        const url = author ? `/api/quotes?author=${encodeURIComponent(author)}` : '/api/quotes';
+        try {
+          const res = await fetch(url);
           const body = await res.json();
           if (!res.ok) {
             showError(listError, body.error?.message ?? 'Failed to load quotes.');
@@ -283,11 +312,13 @@
             showError(listError, body.error?.message ?? 'Delete failed.');
             return;
           }
-          await Promise.all([loadQuotes(), loadRandom()]);
+          await Promise.all([loadQuotes(authorFilter.value.trim()), loadRandom(), loadCount()]);
         } catch {
           showError(listError, 'Could not reach the server.');
         }
       }
+
+      authorFilter.addEventListener('input', () => loadQuotes(authorFilter.value.trim()));
 
       document.getElementById('refresh-btn').addEventListener('click', loadRandom);
 
@@ -313,7 +344,7 @@
           }
           document.getElementById('text-input').value = '';
           document.getElementById('author-input').value = '';
-          await Promise.all([loadQuotes(), loadRandom()]);
+          await Promise.all([loadQuotes(authorFilter.value.trim()), loadRandom(), loadCount()]);
         } catch {
           showError(formError, 'Could not reach the server.');
         }
@@ -321,6 +352,7 @@
 
       loadRandom();
       loadQuotes();
+      loadCount();
     </script>
   </body>
 </html>

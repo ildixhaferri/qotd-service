@@ -11,8 +11,27 @@ export function quotesRouter(db: InstanceType<typeof Database>) {
   const router = new Hono();
 
   router.get('/', (c) => {
+    const author = c.req.query('author');
+    if (author !== undefined) {
+      if (typeof author !== 'string' || author.trim() === '') {
+        return c.json(
+          { error: { code: 'INVALID_INPUT', message: 'author query param must not be empty' } },
+          400,
+        );
+      }
+      const pattern = `%${author.trim()}%`;
+      const quotes = db
+        .prepare('SELECT * FROM quotes WHERE author LIKE ? ORDER BY id')
+        .all(pattern) as Quote[];
+      return c.json({ data: quotes });
+    }
     const quotes = db.prepare('SELECT * FROM quotes ORDER BY id').all() as Quote[];
     return c.json({ data: quotes });
+  });
+
+  router.get('/count', (c) => {
+    const row = db.prepare('SELECT COUNT(*) AS count FROM quotes').get() as { count: number };
+    return c.json({ data: { count: row.count } });
   });
 
   router.get('/random', (c) => {
