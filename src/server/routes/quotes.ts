@@ -12,6 +12,25 @@ export function quotesRouter(db: InstanceType<typeof Database>) {
 
   router.get('/', (c) => {
     const author = c.req.query('author');
+    const limitRaw = c.req.query('limit');
+    const offsetRaw = c.req.query('offset');
+
+    const limit = limitRaw !== undefined ? Number(limitRaw) : undefined;
+    const offset = offsetRaw !== undefined ? Number(offsetRaw) : 0;
+
+    if (limit !== undefined && (!Number.isInteger(limit) || limit < 1 || limit > 100)) {
+      return c.json(
+        { error: { code: 'INVALID_INPUT', message: 'limit must be an integer between 1 and 100' } },
+        400,
+      );
+    }
+    if (!Number.isInteger(offset) || offset < 0) {
+      return c.json(
+        { error: { code: 'INVALID_INPUT', message: 'offset must be a non-negative integer' } },
+        400,
+      );
+    }
+
     if (author !== undefined) {
       if (typeof author !== 'string' || author.trim() === '') {
         return c.json(
@@ -20,12 +39,23 @@ export function quotesRouter(db: InstanceType<typeof Database>) {
         );
       }
       const pattern = `%${author.trim()}%`;
-      const quotes = db
-        .prepare('SELECT * FROM quotes WHERE author LIKE ? ORDER BY id')
-        .all(pattern) as Quote[];
+      const quotes =
+        limit !== undefined
+          ? (db
+              .prepare('SELECT * FROM quotes WHERE author LIKE ? ORDER BY id LIMIT ? OFFSET ?')
+              .all(pattern, limit, offset) as Quote[])
+          : (db
+              .prepare('SELECT * FROM quotes WHERE author LIKE ? ORDER BY id')
+              .all(pattern) as Quote[]);
       return c.json({ data: quotes });
     }
-    const quotes = db.prepare('SELECT * FROM quotes ORDER BY id').all() as Quote[];
+
+    const quotes =
+      limit !== undefined
+        ? (db
+            .prepare('SELECT * FROM quotes ORDER BY id LIMIT ? OFFSET ?')
+            .all(limit, offset) as Quote[])
+        : (db.prepare('SELECT * FROM quotes ORDER BY id').all() as Quote[]);
     return c.json({ data: quotes });
   });
 
